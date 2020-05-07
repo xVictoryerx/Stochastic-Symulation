@@ -1,5 +1,8 @@
 package hu.bme.mit.inf.dslreasoner.viatrasolver.reasoner;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Random;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -7,6 +10,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.viatra.query.runtime.api.IPatternMatch;
 import org.eclipse.viatra.query.runtime.api.ViatraQueryEngine;
 import org.eclipse.viatra.query.runtime.api.ViatraQueryMatcher;
 import org.eclipse.viatra.query.runtime.emf.EMFScope;
@@ -53,16 +57,39 @@ public class StochasticSimulator extends LogicReasoner{
 		
 		ViatraQueryEngine engine = ViatraQueryEngine.on(new EMFScope(emptySolution));
 		
+		ArrayList<ViatraQueryMatcher<?>> matcherList = new ArrayList<>();
 		Map<ViatraQueryMatcher<?>,Consumer<?>> matcher2Action = new HashMap<>();
 		for (BatchTransformationRule<?, ?> objectRefinementRule : method.getObjectRefinementRules()) {
 			ViatraQueryMatcher<?> matcher = engine.getMatcher(objectRefinementRule.getPrecondition());
 			Consumer<?> action = objectRefinementRule.getAction();
 			matcher2Action.put(matcher,action);
+			matcherList.add(matcher);
 		}
+		
+		ArrayList<IPatternMatch> currentMatches = new ArrayList<>();
+		Map<IPatternMatch,ViatraQueryMatcher<?>> match2Matcher = new HashMap<>();
 		for(int i = 0; i < 100; ++i)
 		{
-			//matcher.getAllMatches();
-			//action.accept();
+			ArrayList<IPatternMatch> tempMatches = new ArrayList<>();
+			for(int j = 0; j < matcherList.size(); ++j)
+			{
+				ViatraQueryMatcher<?> tempMatcher = matcherList.get(j);
+				tempMatches.clear();
+				tempMatches.addAll(tempMatcher.getAllMatches());
+				currentMatches.addAll(tempMatches);
+				for(int k = 0; k < tempMatches.size(); ++k)
+				{
+					match2Matcher.put(tempMatches.get(k), tempMatcher);
+				}
+			}
+			Random rand = new Random();
+			if(currentMatches.size() > 0)
+			{
+				int index = rand.nextInt(currentMatches.size());
+				IPatternMatch selectedMatch = currentMatches.get(index);
+				ViatraQueryMatcher<?> selectedMatcher = match2Matcher.get(selectedMatch);
+				matcher2Action.get(selectedMatcher).accept(selectedMatch);
+			}
 		}
 		return null;
 	}
